@@ -8,7 +8,9 @@ const server = net.createServer((socket) => {
   socket.on("data", (data) => {
     const req = data.toString();
 
-    const [path] = req.split(" ");
+    const [, path] = req.split(" ");
+
+    console.log(path);
 
     const response =
       path === "/"
