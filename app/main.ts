@@ -18,8 +18,6 @@ const server = net.createServer((socket) => {
     socket.write(response);
     socket.end();
   });
-
-  socket.end();
 });
 
 server.listen(port, "localhost", () => {
