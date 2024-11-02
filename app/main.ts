@@ -14,13 +14,15 @@ const server = net.createServer((socket) => {
   socket.on("data", (data) => {
     const req = data.toString();
 
-    const [method, path] = req.split(" ");
+    const [path] = req.split(" ");
 
-    if (path !== "/") {
-      return 404;
-    }
+    const response =
+      path === "/"
+        ? "HTTP/1.1 200 OK\r\n\r\n"
+        : "HTTP/1.1 404 Not Found\r\n\r\n";
 
-    return 200;
+    socket.write(response);
+    socket.end();
   });
 
   socket.end();
