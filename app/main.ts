@@ -11,7 +11,8 @@ enum StatusCode {
 
 const createResponse = (statusCode: StatusCode, body: string) => {
   return `HTTP/1.1 ${statusCode}\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(
-    body
+    body,
+    "utf-8"
   )}\r\n\r\n${body}`;
 };
 
