@@ -11,8 +11,7 @@ enum StatusCode {
 
 const createResponse = (statusCode: StatusCode, body: string) => {
   return `HTTP/1.1 ${statusCode}\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(
-    body,
-    "utf-8"
+    body
   )}\r\n\r\n${body}`;
 };
 
@@ -27,7 +26,8 @@ const server = net.createServer((socket) => {
     if (path === "/") {
       response = createResponse(StatusCode.OK, "Hello, World!");
     } else if (mainRoute === "echo" && subRoute) {
-      const body = `Echo: ${subRoute}`;
+      const body = `${subRoute}`;
+      console.log(body);
       response = createResponse(StatusCode.OK, body);
     } else {
       response = createResponse(StatusCode.NOT_FOUND, "Not Found");
