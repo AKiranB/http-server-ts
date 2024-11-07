@@ -9,7 +9,7 @@ enum StatusCode {
   "NOT_FOUND" = "404 Not Found",
 }
 
-const createResponse = (statusCode: number, body: string) => {
+const createResponse = (statusCode: StatusCode, body: string) => {
   return `HTTP/1.1 ${statusCode}\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(
     body
   )}\r\n\r\n${body}`;
@@ -24,14 +24,13 @@ const server = net.createServer((socket) => {
     let response;
 
     if (path === "/") {
-      response = createResponse(200, "Hello, World!");
+      response = createResponse(StatusCode.OK, "Hello, World!");
     } else if (mainRoute === "echo" && subRoute) {
       const body = `Echo: ${subRoute}`;
-      response = createResponse(200, body);
+      response = createResponse(StatusCode.OK, body);
     } else {
-      response = createResponse(404, "Not Found");
+      response = createResponse(StatusCode.NOT_FOUND, "Not Found");
     }
-
     socket.write(response);
     socket.end();
   });
