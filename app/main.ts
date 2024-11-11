@@ -78,9 +78,7 @@ const server = net.createServer((socket) => {
         break;
       case `files/${subPath}`:
         try {
-          const file = await require("fs").promises.readFile(
-            `./files/tmp/${subPath}`
-          );
+          const file = await require("fs").promises.readFile(`/tmp/${subPath}`);
           response = createResponse({
             statusCode: StatusCode.OK,
             body: file,
