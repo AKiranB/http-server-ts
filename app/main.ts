@@ -7,6 +7,15 @@ enum StatusCode {
   "NOT_FOUND" = "404 Not Found",
 }
 
+interface ParsedRequestBody {
+  method: string;
+  path: string;
+  protocol: string;
+  Host: string;
+  Accept: string;
+  "User-Agent": string;
+}
+
 const createResponse = (statusCode: StatusCode, body: string) => {
   return `HTTP/1.1 ${statusCode}\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(
     body
@@ -26,7 +35,7 @@ const createParsedRequestBody = (requestLines: string[]) => {
     if (key && value) obj[key] = value;
   });
 
-  return obj;
+  return obj as ParsedRequestBody;
 };
 
 const server = net.createServer((socket) => {
