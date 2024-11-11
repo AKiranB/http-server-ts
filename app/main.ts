@@ -13,30 +13,48 @@ const createResponse = (statusCode: StatusCode, body: string) => {
   )}\r\n\r\n${body}`;
 };
 
+const createParsedRequestBody = (requestLines: string[]) => {
+  const obj: Record<string, any> = {};
+  requestLines.forEach((line: string, index) => {
+    if (index === 0) {
+      const [method, path, protocol] = line.split(" ");
+      obj["method"] = method;
+      obj["path"] = path;
+      obj["protocol"] = protocol;
+    }
+    const [key, value] = line.split(": ");
+    if (key && value) obj[key] = value;
+  });
+
+  return obj;
+};
+
 const server = net.createServer((socket) => {
   socket.on("data", (data) => {
-    const request = data.toString().split(" ");
+    const requestLines = data.toString().split("\r\n");
 
-    const path = request[1];
-    const paths = path.split("/");
-    const subRoute = paths[2];
+    const parsedRequestBody = createParsedRequestBody(requestLines);
+    const [path, subPath] = parsedRequestBody.path.split("/");
+
+    console.log(parsedRequestBody.path);
 
     let response;
     let body;
 
-    switch (path) {
+    switch (parsedRequestBody.path) {
       case "/":
         response = createResponse(StatusCode.OK, "Connected To server");
         break;
       case "/echo":
         response = createResponse(StatusCode.OK, "echo");
         break;
-      case `/echo/${subRoute}`:
-        body = `${subRoute}`;
+      case `/echo/${subPath}`:
+        body = `${subPath}`;
         response = createResponse(StatusCode.OK, body);
         break;
       case "/user-agent":
-        body = request[request.length - 1];
+        body = parsedRequestBody["User-Agent"];
+        if (!body) body = "User-Agent not found";
         response = createResponse(StatusCode.OK, body);
         break;
       default:
