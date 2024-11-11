@@ -67,7 +67,6 @@ const server = net.createServer((socket) => {
         response = createResponse(StatusCode.NOT_FOUND, "Not Found");
         break;
     }
-
     socket.write(response);
     socket.end();
   });
