@@ -92,7 +92,7 @@ const server = net.createServer((socket) => {
           response = createResponse({
             statusCode: StatusCode.OK,
             body: file,
-            contentType: "octet-stream",
+            contentType: "application/octet-stream",
           });
           socket.write(response);
           socket.write(file);
