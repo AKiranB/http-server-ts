@@ -34,14 +34,12 @@ const server = net.createServer((socket) => {
     const requestLines = data.toString().split("\r\n");
 
     const parsedRequestBody = createParsedRequestBody(requestLines);
-    const [path, subPath] = parsedRequestBody.path.split("/");
-
-    console.log(parsedRequestBody.path);
-
+    const path = parsedRequestBody.path;
+    const [, mainPath, subPath] = path.split("/");
     let response;
     let body;
 
-    switch (parsedRequestBody.path) {
+    switch (path) {
       case "/":
         response = createResponse(StatusCode.OK, "Connected To server");
         break;
@@ -49,12 +47,11 @@ const server = net.createServer((socket) => {
         response = createResponse(StatusCode.OK, "echo");
         break;
       case `/echo/${subPath}`:
-        body = `${subPath}`;
+        body = subPath || "echo";
         response = createResponse(StatusCode.OK, body);
         break;
       case "/user-agent":
-        body = parsedRequestBody["User-Agent"];
-        if (!body) body = "User-Agent not found";
+        body = parsedRequestBody["User-Agent"] || "User-Agent not found";
         response = createResponse(StatusCode.OK, body);
         break;
       default:
