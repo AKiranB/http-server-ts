@@ -21,7 +21,7 @@ interface ParsedRequestBody {
 const createResponse = ({
   statusCode,
   body,
-  contentType = "text",
+  contentType = "text/plain",
 }: {
   statusCode: StatusCode;
   body: string;
@@ -31,7 +31,7 @@ const createResponse = ({
     ? body.length
     : Buffer.byteLength(body);
 
-  return `HTTP/1.1 ${statusCode}\r\nContent-Type: ${contentType}/plain\r\nContent-Length: ${contentLength}\r\n\r\n${body}`;
+  return `HTTP/1.1 ${statusCode}\r\nContent-Type: ${contentType}\r\nContent-Length: ${contentLength}\r\n\r\n${body}`;
 };
 
 const createParsedRequestBody = (requestLines: string[]) => {
