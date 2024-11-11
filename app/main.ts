@@ -1,5 +1,6 @@
 import { file } from "bun";
 import * as net from "net";
+import * as filePath from "path";
 
 const port = 4221;
 
@@ -48,6 +49,11 @@ const createParsedRequestBody = (requestLines: string[]) => {
   return obj as ParsedRequestBody;
 };
 
+const args = process.argv;
+const directoryFlagIndex = args.indexOf("--directory");
+const baseDirectory =
+  directoryFlagIndex !== -1 ? args[directoryFlagIndex + 1] : null;
+
 const server = net.createServer((socket) => {
   socket.on("data", async (data) => {
     const requestLines = data.toString().split("\r\n");
@@ -79,7 +85,10 @@ const server = net.createServer((socket) => {
       case `/files/${subPath}`:
         console.log("reacehed");
         try {
-          const file = await require("fs").promises.readFile(`/tmp/${subPath}`);
+          if (!baseDirectory) return;
+
+          const fp = filePath.join(baseDirectory, subPath);
+          const file = await require("fs").promises.readFile(fp);
           response = createResponse({
             statusCode: StatusCode.OK,
             body: file,
