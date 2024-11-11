@@ -76,7 +76,8 @@ const server = net.createServer((socket) => {
         body = parsedRequestBody["User-Agent"] || "User-Agent not found";
         response = createResponse({ statusCode: StatusCode.OK, body: body });
         break;
-      case `files/${subPath}`:
+      case `/files/${subPath}`:
+        console.log("reacehed");
         try {
           const file = await require("fs").promises.readFile(`/tmp/${subPath}`);
           response = createResponse({
