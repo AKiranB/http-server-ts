@@ -1,7 +1,5 @@
 import * as net from "net";
 
-console.log("Logs from your program will appear here!");
-
 const port = 4221;
 
 enum StatusCode {
@@ -17,21 +15,35 @@ const createResponse = (statusCode: StatusCode, body: string) => {
 
 const server = net.createServer((socket) => {
   socket.on("data", (data) => {
-    const request = data.toString();
-    const [, path] = request.split(" ");
-    const [, mainRoute, subRoute] = path.split("/");
+    const request = data.toString().split(" ");
+
+    const path = request[1];
+    const paths = path.split("/");
+    const subRoute = paths[2];
 
     let response;
+    let body;
 
-    if (path === "/") {
-      response = createResponse(StatusCode.OK, "Hello, World!");
-    } else if (mainRoute === "echo" && subRoute) {
-      const body = `${subRoute}`;
-      console.log(body);
-      response = createResponse(StatusCode.OK, body);
-    } else {
-      response = createResponse(StatusCode.NOT_FOUND, "Not Found");
+    switch (path) {
+      case "/":
+        response = createResponse(StatusCode.OK, "Connected To server");
+        break;
+      case "/echo":
+        response = createResponse(StatusCode.OK, "echo");
+        break;
+      case `/echo/${subRoute}`:
+        body = `${subRoute}`;
+        response = createResponse(StatusCode.OK, body);
+        break;
+      case "/user-agent":
+        body = request[request.length - 1];
+        response = createResponse(StatusCode.OK, body);
+        break;
+      default:
+        response = createResponse(StatusCode.NOT_FOUND, "Not Found");
+        break;
     }
+
     socket.write(response);
     socket.end();
   });
