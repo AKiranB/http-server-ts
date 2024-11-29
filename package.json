@@ -6,6 +6,10 @@
     "dev": "bun run app/main.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.7"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
   }
 }

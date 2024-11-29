@@ -1,171 +1,152 @@
 import * as net from "net";
-import * as fs from "fs/promises";
-import * as filePath from "path";
+import { StatusCode, type ParsedRequestBody } from "./types";
+import { handleFileRequest } from "./utils";
+import { createToken, verifyToken } from "./jwt";
 
 const port = 4221;
 
-enum StatusCode {
-  "OK" = "200 OK",
-  "NOT_FOUND" = "404 Not Found",
-  "INTERNAL_SERVER_ERROR" = "500 Internal Server Error",
-  "CREATED" = "201 Created",
-}
-
-interface ParsedRequestBody {
-  method: string;
-  path: string;
-  protocol: string;
-  Host: string;
-  Accept: string;
-  "Content-type": string;
-  "Content-Length": string;
-  "User-Agent": string;
-  body: string;
-}
-
-const handleFileGetRequest = async ({
-  fileName,
-  onSuccess,
-  onFailure,
-}: {
-  fileName: string;
-  onSuccess: (respons: any, file: any) => void;
-  onFailure: (response: any) => void;
-}) => {
-  let response;
-  try {
-    const fp = getFilePath(fileName);
-    const file = await require("fs").promises.readFile(fp);
-    response = createResponse({
-      statusCode: StatusCode.OK,
-      body: file,
-      contentType: "application/octet-stream",
-    });
-    onSuccess(response, file);
-  } catch (err) {
-    response = createResponse({
-      statusCode: StatusCode.NOT_FOUND,
-      body: "File not found",
-    });
-    onFailure(response);
-  }
-};
-
-const getFolderPath = () => {
-  const args = process.argv;
-  const directoryFlagIndex = args.indexOf("--directory");
-  const pathArgs =
-    directoryFlagIndex !== -1 ? args[directoryFlagIndex + 1] : "./files";
-
-  return pathArgs;
-};
-
-const getFilePath = (fileName: string) => {
-  const pathArgs = getFolderPath();
-  return filePath.join(pathArgs, fileName);
-};
-
-const handleFilePostRequest = async ({
-  data,
-  fileName,
-}: {
-  data: string;
-  fileName: string;
-}) => {
-  const filesDir = getFolderPath();
-  try {
-    await fs.mkdir(filesDir, { recursive: true });
-    const filePath = getFilePath(fileName);
-    await fs.writeFile(filePath, data);
-  } catch (err) {
-    throw new Error("error creating file", err as ErrorOptions);
-  }
-};
-
-const handleFileRequest = async (
-  fileName: string,
-  method: string,
-  body: string,
-  socket: net.Socket
+const handleResponse = (
+  path: string,
+  subpath: string,
+  parsedRequestBody: ParsedRequestBody,
+  responder: Responder
 ) => {
-  if (method === "GET") {
-    await handleFileGetRequest({
-      fileName,
-      onSuccess: (response, file) => {
-        socket.write(response);
-        socket.write(file);
-      },
-      onFailure: (response) => {
-        socket.write(response);
-      },
-    });
+  switch (path) {
+    case "/":
+      break;
+
+    case "/echo":
+      responder.send({ statusCode: StatusCode.OK, body: "echo" });
+      return;
+
+    case `/echo/${subpath}`:
+      responder.send({ statusCode: StatusCode.OK, body: subpath || "echo" });
+      return;
+
+    case "/user-agent":
+      responder.send({
+        statusCode: StatusCode.OK,
+        body: parsedRequestBody["User-Agent"] || "User-Agent not found",
+      });
+      return;
+
+    case `/files/${subpath}`:
+      responder.handleFileRequest({
+        fileName: subpath,
+        method: parsedRequestBody.method,
+        body: parsedRequestBody.body,
+      });
+      return;
+
+    case "/login":
+      const { body } = parsedRequestBody || {};
+      const parsedBody = JSON.parse(body);
+      const { username, password } = parsedBody;
+      if (username === "testuser" && password === "password123") {
+        const token = createToken({ username }, Date.now() + 10000);
+        responder.send({
+          statusCode: StatusCode.OK,
+          body: token,
+          contentType: "application/json",
+        });
+      } else {
+        responder.send({
+          statusCode: StatusCode.NOT_FOUND,
+          body: "Login Failed",
+        });
+      }
+      break;
+
+    case "/protected":
+      const authHeader = parsedRequestBody.Authorization;
+      const token = authHeader.split(" ")[1];
+      const decodedToken = verifyToken({ token });
+
+      if (decodedToken) {
+        responder.send({
+          statusCode: StatusCode.OK,
+          body: "...mock-Protected Data",
+        });
+      } else {
+        responder.send({
+          statusCode: StatusCode.UNAUTHORIZED,
+          body: "Unauthorized",
+        });
+      }
+      break;
+
+    default:
+      responder.send({
+        statusCode: StatusCode.NOT_FOUND,
+        body: "Not Found",
+      });
+      break;
+  }
+};
+
+const createResponseFunction = (socket: net.Socket) => {
+  return (response: any) => {
+    socket.write(response);
+    socket.end();
+  };
+};
+
+class Responder {
+  private socket: net.Socket;
+
+  constructor(socket: net.Socket) {
+    this.socket = socket;
   }
 
-  handleFilePostRequest({
-    data: body,
-    fileName,
-  });
-  const response = createResponse({
-    statusCode: StatusCode.CREATED,
-    body: "File created successfully",
-  });
+  send({
+    statusCode,
+    body,
+    contentType = "text/plain",
+  }: {
+    statusCode: StatusCode;
+    body: string;
+    contentType?: string;
+  }) {
+    const response = createResponse({ statusCode, body, contentType });
+    const respond = createResponseFunction(this.socket);
+    respond(response);
+  }
 
-  socket.write(response);
+  handleFileRequest({
+    fileName,
+    method,
+    body,
+  }: {
+    fileName: string;
+    method: string;
+    body: string;
+  }) {
+    handleFileRequest(fileName, method, body, this.socket);
+  }
+}
+
+const getInformationFromRequest = ({ request }: { request: Buffer }) => {
+  const requestLines = request.toString().split("\r\n");
+  requestLines;
+  const parsedRequestBody = createParsedRequestBody(requestLines);
+  const path = parsedRequestBody.path;
+  const subPath = path.split("/")?.[2];
+
+  return {
+    parsedRequestBody,
+    path,
+    subPath,
+  };
 };
 
 const server = net.createServer((socket) => {
   socket.on("data", async (data) => {
-    const requestLines = data.toString().split("\r\n");
-    const parsedRequestBody = createParsedRequestBody(requestLines);
-    const path = parsedRequestBody.path;
-    const subPath = path.split("/")?.[2];
+    const { parsedRequestBody, path, subPath } = getInformationFromRequest({
+      request: data,
+    });
 
-    let response;
-
-    switch (path) {
-      case "/":
-        response = createResponse({
-          statusCode: StatusCode.OK,
-          body: "Connected To server",
-        });
-        break;
-
-      case "/echo":
-        response = createResponse({ statusCode: StatusCode.OK, body: "echo" });
-        break;
-
-      case `/echo/${subPath}`:
-        response = createResponse({
-          statusCode: StatusCode.OK,
-          body: subPath || "echo",
-        });
-        break;
-
-      case "/user-agent":
-        response = createResponse({
-          statusCode: StatusCode.OK,
-          body: parsedRequestBody["User-Agent"] || "User-Agent not found",
-        });
-        break;
-
-      case `/files/${subPath}`:
-        await handleFileRequest(
-          subPath,
-          parsedRequestBody.method,
-          parsedRequestBody.body,
-          socket
-        );
-        break;
-
-      default:
-        response = createResponse({
-          statusCode: StatusCode.NOT_FOUND,
-          body: "Not Found",
-        });
-        break;
-    }
-    socket.write(response ?? "");
-    socket.end();
+    const responder = new Responder(socket);
+    handleResponse(path, subPath, parsedRequestBody, responder);
   });
 });
 
