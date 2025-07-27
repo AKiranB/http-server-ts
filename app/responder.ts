@@ -9,17 +9,53 @@ export const createResponseFunction = (socket: net.Socket) => {
     };
 };
 
-export const createResponse = ({
-    statusCode,
-    body,
-    contentType = "text/plain",
-}: {
-    statusCode: StatusCode;
-    body: string;
-    contentType?: string;
-}) => {
+const createHeaderObject = (
+    contentType: string | undefined,
+    encodingType: string | undefined,
+    contentLength: number | undefined
+) => {
+    return {
+        "Content-Type": contentType,
+        "Content-Length": contentLength,
+        "Content-Encoding": encodingType,
+    };
+};
+
+const createHeaders = (headerObject: ReturnType<typeof createHeaderObject>) => {
+    let headers = "";
+
+    for (const prop in headerObject) {
+        const key = prop as keyof ReturnType<typeof createHeaderObject>;
+        if (!headerObject[key]) continue;
+        headers += `${prop}:${headerObject[key]}\r\n`;
+    }
+
+    return headers;
+};
+
+const getContentLength = (body: string | Buffer | undefined) => {
+    if (!body) return undefined;
     const contentLength = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body);
-    return `HTTP/1.1 ${statusCode}\r\nContent-Type: ${contentType}\r\nContent-Length: ${contentLength}\r\n\r\n${body}`;
+    return contentLength;
+};
+
+export const createResponse = ({
+    body,
+    statusCode,
+    contentType,
+    encodingType,
+}: {
+    body?: string;
+    statusCode: StatusCode;
+    contentType?: string;
+    encodingType?: string;
+}) => {
+    const contentLength = getContentLength(body);
+    const headerObject = createHeaderObject(contentType, encodingType, contentLength);
+    const headers = createHeaders(headerObject);
+    const response = `HTTP/1.1 ${statusCode}\r\n${headers}\r\n`;
+
+    return body ? `${response}${body}` : response;
 };
 
 export default class Responder {
@@ -33,12 +69,14 @@ export default class Responder {
         statusCode,
         body,
         contentType = "text/plain",
+        encodingType,
     }: {
         statusCode: StatusCode;
-        body: string;
+        body?: string;
         contentType?: string;
+        encodingType?: string;
     }) {
-        const response = createResponse({ statusCode, body, contentType });
+        const response = createResponse({ body, statusCode, contentType, encodingType });
         const respond = createResponseFunction(this.socket);
         respond(response);
     }
