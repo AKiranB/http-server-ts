@@ -1,9 +1,18 @@
 import * as net from "net";
 import { StatusCode, type ParsedRequestBody } from "./types";
-import { createToken, verifyToken } from "./jwt";
 import Responder from "./responder";
 
 const port = 4221;
+
+const acceptedEncodings = ["gzip", "deflate", "br", "identity"];
+
+const getEncodingType = (clientEncodingHeader: string) => {
+    if (acceptedEncodings.includes(clientEncodingHeader)) {
+        console.log("true");
+        return clientEncodingHeader;
+    }
+    return null;
+};
 
 const handleResponse = (
     req: ReturnType<typeof parseRequestBody>,
@@ -12,6 +21,7 @@ const handleResponse = (
 ) => {
     switch (req.path) {
         case "/":
+            res.send({ statusCode: StatusCode.OK });
             break;
 
         case "/echo":
@@ -19,7 +29,13 @@ const handleResponse = (
             return;
 
         case `/echo/${subPath}`:
-            res.send({ statusCode: StatusCode.OK, body: subPath || "echo" });
+            res.send({
+                statusCode: StatusCode.OK,
+                body: subPath || "echo",
+                encodingType: getEncodingType(req["Accept-Encoding"])
+                    ? req["Accept-Encoding"]
+                    : undefined,
+            });
             return;
 
         case "/user-agent":
@@ -37,42 +53,41 @@ const handleResponse = (
             });
             return;
 
-        case "/login":
-            const { body } = req || {};
-            const parsedBody = JSON.parse(body);
-            const { username, password } = parsedBody;
-            if (username === "testuser" && password === "password123") {
-                const token = createToken({ username }, Date.now() + 10000);
-                res.send({
-                    statusCode: StatusCode.OK,
-                    body: token,
-                    contentType: "application/json",
-                });
-            } else {
-                res.send({
-                    statusCode: StatusCode.NOT_FOUND,
-                    body: "Login Failed",
-                });
-            }
-            break;
+        // case "/login":
+        //     const { body } = req || {};
+        //     const parsedBody = JSON.parse(body);
+        //     const { username, password } = parsedBody;
+        //     if (username === "testuser" && password === "password123") {
+        //         res.send({
+        //             statusCode: StatusCode.OK,
+        //             body: token,
+        //             contentType: "application/json",
+        //         });
+        //     } else {
+        //         res.send({
+        //             statusCode: StatusCode.NOT_FOUND,
+        //             body: "Login Failed",
+        //         });
+        //     }
+        //     break;
 
-        case "/protected":
-            const authHeader = req.Authorization;
-            const token = authHeader.split(" ")[1];
-            const decodedToken = verifyToken({ token });
+        // case "/protected":
+        //     const authHeader = req.Authorization;
+        //     const token = authHeader.split(" ")[1];
+        //     const decodedToken = verifyToken({ token });
 
-            if (decodedToken) {
-                res.send({
-                    statusCode: StatusCode.OK,
-                    body: "...mock-Protected Data",
-                });
-            } else {
-                res.send({
-                    statusCode: StatusCode.UNAUTHORIZED,
-                    body: "Unauthorized",
-                });
-            }
-            break;
+        //     if (decodedToken) {
+        //         res.send({
+        //             statusCode: StatusCode.OK,
+        //             body: "...mock-Protected Data",
+        //         });
+        //     } else {
+        //         res.send({
+        //             statusCode: StatusCode.UNAUTHORIZED,
+        //             body: "Unauthorized",
+        //         });
+        //     }
+        //     break;
 
         default:
             res.send({
