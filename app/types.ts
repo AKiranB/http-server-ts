@@ -1,3 +1,5 @@
+import type { createResponseHeader } from "./responder";
+
 export enum StatusCode {
     "OK" = "200 OK",
     "NOT_FOUND" = "404 Not Found",
@@ -19,3 +21,5 @@ export interface ParsedRequestBody {
     "Accept-Encoding": string;
     body: string;
 }
+
+export type Response = ReturnType<typeof createResponseHeader>;
