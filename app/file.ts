@@ -1,8 +1,9 @@
 import * as net from "net";
+import { promises } from "fs";
 import * as fs from "fs/promises";
 import * as filePath from "path";
 import { StatusCode } from "./types";
-import { createResponse } from "./responder";
+import Responder, { createResponseHeader } from "./responder";
 
 export const getFolderPath = () => {
     const args = process.argv;
@@ -17,35 +18,30 @@ export const getFilePath = (fileName: string) => {
     return filePath.join(pathArgs, fileName);
 };
 
-export const handleFileGet = async ({
-    fileName,
-    onSuccess,
-    onFailure,
-}: {
-    fileName: string;
-    onSuccess: (respons: any, file: any) => void;
-    onFailure: (response: any) => void;
-}) => {
-    let response;
+export const handleFileGet = async ({ res, fileName }: { res: Responder; fileName: string }) => {
     try {
-        const fp = getFilePath(fileName);
-        const file = await require("fs").promises.readFile(fp);
-        response = createResponse({
-            statusCode: StatusCode.OK,
-            body: file,
-            contentType: "application/octet-stream",
+        const file = await getFile({ fileName });
+        res.setBody(file);
+        res.setHeaders({
+            key: "Content-Type",
+            value: "application/octet-stream",
         });
-        onSuccess(response, file);
-    } catch (err) {
-        response = createResponse({
-            statusCode: StatusCode.NOT_FOUND,
-            body: "File not found",
-        });
-        onFailure(response);
+        res.setStatusCode(StatusCode.OK);
+    } catch (e) {
+        res.setStatusCode(StatusCode.NOT_FOUND);
+        res.setBody("File not found");
     }
+
+    res.send();
 };
 
-export const handleFilePost = async ({ data, fileName }: { data: string; fileName: string }) => {
+export const getFile = async ({ fileName }: { fileName: string }) => {
+    const fp = getFilePath(fileName);
+    const file = await promises.readFile(fp);
+    return file;
+};
+
+export const createFile = async ({ data, fileName }: { data: string; fileName: string }) => {
     const filesDir = getFolderPath();
     try {
         await fs.mkdir(filesDir, { recursive: true });
@@ -56,33 +52,21 @@ export const handleFilePost = async ({ data, fileName }: { data: string; fileNam
     }
 };
 
-export const handleFileRequest = async (
-    fileName: string,
-    method: string,
-    body: string,
-    socket: net.Socket
-) => {
-    if (method === "GET") {
-        await handleFileGet({
-            fileName,
-            onSuccess: (response, file) => {
-                socket.write(response);
-                socket.write(file);
-            },
-            onFailure: (response) => {
-                socket.write(response);
-            },
-        });
+export const handleFilePost = async ({
+    fileName,
+    body,
+    res,
+}: {
+    fileName: string;
+    body: string;
+    res: Responder;
+}) => {
+    try {
+        await createFile({ data: body, fileName });
+        res.setBody("File created successfully");
+        res.setStatusCode(StatusCode.CREATED);
+        res.send();
+    } catch (e) {
+        throw new Error();
     }
-
-    handleFilePost({
-        data: body,
-        fileName,
-    });
-    const response = createResponse({
-        statusCode: StatusCode.CREATED,
-        body: "File created successfully",
-    });
-
-    socket.write(response);
 };
