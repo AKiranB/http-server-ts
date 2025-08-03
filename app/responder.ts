@@ -1,95 +1,73 @@
 import type { StatusCode } from "./types";
 import * as net from "net";
-import { handleFileRequest } from "./file";
+import { createHeaders } from "./headers";
+import { convertHexToBuffer, getContentLength } from "./utils";
 
 export const createResponseFunction = (socket: net.Socket) => {
-    return (response: any) => {
-        socket.write(response);
+    return ({ responseHeader, body }: { responseHeader: string; body?: string | Buffer }) => {
+        socket.write(responseHeader);
+        if (body) socket.write(body);
         socket.end();
     };
 };
 
-const createHeaderObject = (
-    contentType: string | undefined,
-    encodingType: string | undefined,
-    contentLength: number | undefined
-) => {
-    return {
-        "Content-Type": contentType,
-        "Content-Length": contentLength,
-        "Content-Encoding": encodingType,
-    };
+const compressIfNeeded = ({ body, encodingType }: { body?: string; encodingType?: string }) => {
+    if (!body) return;
+    return encodingType ? convertHexToBuffer(body) : body;
 };
 
-const createHeaders = (headerObject: ReturnType<typeof createHeaderObject>) => {
-    let headers = "";
+const HTTP_VERSION = "HTTP/1.1";
 
-    for (const prop in headerObject) {
-        const key = prop as keyof ReturnType<typeof createHeaderObject>;
-        if (!headerObject[key]) continue;
-        headers += `${prop}:${headerObject[key]}\r\n`;
-    }
-
-    return headers;
-};
-
-const getContentLength = (body: string | Buffer | undefined) => {
-    if (!body) return undefined;
-    const contentLength = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body);
-    return contentLength;
-};
-
-export const createResponse = ({
-    body,
+export const createResponseHeader = ({
     statusCode,
-    contentType,
-    encodingType,
+    headers,
 }: {
-    body?: string;
-    statusCode: StatusCode;
-    contentType?: string;
-    encodingType?: string;
+    headers: string;
+    statusCode: StatusCode | null;
 }) => {
-    const contentLength = getContentLength(body);
-    const headerObject = createHeaderObject(contentType, encodingType, contentLength);
-    const headers = createHeaders(headerObject);
-    const response = `HTTP/1.1 ${statusCode}\r\n${headers}\r\n`;
-
-    return body ? `${response}${body}` : response;
+    const response = `${HTTP_VERSION} ${statusCode}\r\n${headers}\r\n`;
+    return response;
 };
 
 export default class Responder {
     private socket: net.Socket;
+    private respond: (response: any) => void;
+    private headers: Map<string, string | number>;
+    private body: string | Buffer | null;
+    private statusCode: StatusCode | null;
 
     constructor(socket: net.Socket) {
         this.socket = socket;
+        this.respond = createResponseFunction(this.socket);
+        this.headers = new Map();
+        this.body = null;
+        this.statusCode = null;
     }
 
-    send({
-        statusCode,
-        body,
-        contentType = "text/plain",
-        encodingType,
-    }: {
-        statusCode: StatusCode;
-        body?: string;
-        contentType?: string;
-        encodingType?: string;
-    }) {
-        const response = createResponse({ body, statusCode, contentType, encodingType });
-        const respond = createResponseFunction(this.socket);
-        respond(response);
+    setHeaders(header: { key: string; value: string }) {
+        const { key, value } = header;
+        this.headers.set(key, value);
     }
 
-    handleFileRequest({
-        fileName,
-        method,
-        body,
-    }: {
-        fileName: string;
-        method: string;
-        body: string;
-    }) {
-        handleFileRequest(fileName, method, body, this.socket);
+    setBody(body: string | Buffer) {
+        this.body = body;
+    }
+
+    setStatusCode(statusCode: StatusCode) {
+        this.statusCode = statusCode;
+    }
+
+    send() {
+        if (!this.headers.has("Content-Length") && this.body) {
+            this.headers.set("Content-Length", getContentLength(this.body));
+        }
+        const headers = createHeaders(this.headers);
+
+        const responseHeader = createResponseHeader({
+            headers,
+            statusCode: this.statusCode,
+        });
+
+        this.respond({ responseHeader, body: this.body });
     }
 }
