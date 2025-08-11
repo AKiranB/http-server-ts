@@ -1,11 +1,11 @@
 import type Responder from "./responder";
 import { StatusCode } from "./types";
-import { getEncodingType, parseRequestBody } from "./utils";
+import { compressWithGzip, getEncodingType, parseRequestBody } from "./utils";
 import { handleFileGet, handleFilePost } from "./file";
 
 export type Req = ReturnType<typeof parseRequestBody>;
 
-const handleResponse = (req: Req, res: Responder, subPath: string) => {
+const handleResponse = async (req: Req, res: Responder, subPath: string) => {
     switch (req.path) {
         case "/":
             res.setStatusCode(StatusCode.OK);
@@ -21,6 +21,8 @@ const handleResponse = (req: Req, res: Responder, subPath: string) => {
         case `/echo/${subPath}`:
             const supportedEncodingType = getEncodingType(req["Accept-Encoding"]);
 
+            let body: string | Buffer = subPath || "echo";
+
             if (supportedEncodingType) {
                 res.setHeaders({
                     key: "Accept-Encoding",
@@ -30,19 +32,40 @@ const handleResponse = (req: Req, res: Responder, subPath: string) => {
                     key: "Content-Encoding",
                     value: supportedEncodingType,
                 });
+                body = await compressWithGzip(subPath);
+            }
+
+            const connectionHeader = req["Connection"];
+
+            if (connectionHeader === "close") {
+                res.setHeaders({
+                    key: "Connection",
+                    value: "close",
+                });
             }
 
             res.setHeaders({
                 key: "Content-Type",
                 value: "text/plain",
             });
-            res.setBody(subPath || "echo");
+            res.setBody(body);
             res.setStatusCode(StatusCode.OK);
             res.send();
             return;
 
         case "/user-agent":
             res.setBody(req["User-Agent"] || "User-Agent not found");
+            // TODO: stop this repetition
+            if (req["Connection"] === "close") {
+                res.setHeaders({
+                    key: "Connection",
+                    value: "close",
+                });
+            }
+            res.setHeaders({
+                key: "Content-Type",
+                value: "text/plain",
+            });
             res.setStatusCode(StatusCode.OK);
             res.send();
             return;
