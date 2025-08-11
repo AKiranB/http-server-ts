@@ -1,6 +1,8 @@
 import type { ParsedRequestBody } from "./types";
 import zlib from "node:zlib";
 
+import { TextEncoder } from "node:util";
+
 const acceptedEncodings = ["gzip", "deflate", "br", "identity"];
 
 export const getEncodingType = (clientEncodingHeader?: string) => {
@@ -17,6 +19,20 @@ export const getEncodingType = (clientEncodingHeader?: string) => {
         return supportedEncoding;
     }
     return null;
+};
+
+export const compressWithGzip = (body: string) => {
+    const encoder = new TextEncoder();
+    const buffer = encoder.encode(body);
+
+    return new Promise<Buffer>((resolve, reject) => {
+        zlib.gzip(buffer, (err, result) => {
+            if (err) {
+                reject(new Error("Error compressing buffer to gzip"));
+            }
+            resolve(result);
+        });
+    });
 };
 
 export const getContentLength = (body: string | Buffer) => {
