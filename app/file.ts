@@ -1,9 +1,8 @@
-import * as net from "net";
 import { promises } from "fs";
 import * as fs from "fs/promises";
 import * as filePath from "path";
 import { StatusCode } from "./types";
-import Responder, { createResponseHeader } from "./responder";
+import Responder from "./responder";
 
 export const getFolderPath = () => {
     const args = process.argv;
