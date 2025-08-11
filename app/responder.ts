@@ -1,19 +1,22 @@
 import type { StatusCode } from "./types";
 import * as net from "net";
 import { createHeaders } from "./headers";
-import { convertHexToBuffer, getContentLength } from "./utils";
+import { getContentLength } from "./utils";
 
 export const createResponseFunction = (socket: net.Socket) => {
-    return ({ responseHeader, body }: { responseHeader: string; body?: string | Buffer }) => {
+    return ({
+        responseHeader,
+        body,
+        shouldClose,
+    }: {
+        responseHeader: string;
+        body?: string | Buffer;
+        shouldClose: boolean;
+    }) => {
         socket.write(responseHeader);
         if (body) socket.write(body);
-        socket.end();
+        if (shouldClose) socket.end();
     };
-};
-
-const compressIfNeeded = ({ body, encodingType }: { body?: string; encodingType?: string }) => {
-    if (!body) return;
-    return encodingType ? convertHexToBuffer(body) : body;
 };
 
 const HTTP_VERSION = "HTTP/1.1";
@@ -61,13 +64,29 @@ export default class Responder {
         if (!this.headers.has("Content-Length") && this.body) {
             this.headers.set("Content-Length", getContentLength(this.body));
         }
-        const headers = createHeaders(this.headers);
+
+        console.log(this.headers);
+
+        const shouldClose = shouldCloseConnection(this.headers);
+        const headerString = createHeaders(this.headers);
 
         const responseHeader = createResponseHeader({
-            headers,
+            headers: headerString,
             statusCode: this.statusCode,
         });
 
-        this.respond({ responseHeader, body: this.body });
+        this.respond({
+            responseHeader,
+            body: this.body,
+            shouldClose,
+        });
     }
 }
+
+const shouldCloseConnection = (headers: Map<string, string | number>) => {
+    const connectionHeader = (headers.get("Connection") as string | undefined)?.toLowerCase();
+    if (connectionHeader === "close") {
+        return true;
+    }
+    return false;
+};
