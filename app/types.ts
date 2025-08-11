@@ -19,6 +19,7 @@ export interface ParsedRequestBody {
     "Content-Length": string;
     "User-Agent": string;
     "Accept-Encoding": string;
+    Connection: string;
     body: string;
 }
 
