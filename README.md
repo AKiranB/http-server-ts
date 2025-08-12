@@ -1,6 +1,6 @@
-## http-server-ts
+# http-server-ts
 
-A handcrafted HTTP server written in TypeScript — built for exploring the guts of HTTP.
+## A handcrafted HTTP server written in TypeScript — built for exploring the guts of HTTP.
 This project dives into the raw details of the HTTP protocol:
 
 Manual header parsing
@@ -87,6 +87,7 @@ Static file serving
 
 📜 License
 MIT — Have fun hacking!
+
 
 
 
