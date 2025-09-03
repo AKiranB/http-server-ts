@@ -71,7 +71,6 @@ export const getInformationFromRequest = ({ request }: { request: Buffer }) => {
     };
 };
 
-// We can use buffer.from here, but I wanted to understand the algorithm a little better
 export const convertHexToBuffer = (hex: string) => {
     const bytes = [];
     for (let i = 0; i < hex.length; i += 2) {
